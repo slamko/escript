@@ -1,28 +1,17 @@
-(defun escript-all (&rest escripts)
-  (progn
-    (start-process-shell-command
-     "escript"
-	 (get-buffer-create "*somewfwe*")
-     (mapconcat
-      (lambda (command)
-        (mapconcat
-		 (lambda (cmd-sym)
-		   (cond ((symbolp cmd-sym) (symbol-name cmd-sym))
-				 ((stringp cmd-sym) cmd-sym))) command " ")) escripts ";"))))
 
-(defun escript-and (&rest escripts)
-  (progn
-    (start-process-shell-command
-     "escript"
-	 nil
-     (mapconcat
-      (lambda (command)
-        (mapconcat
-		 (lambda (cmd-sym)
-		   (cond ((symbolp cmd-sym) (symbol-name cmd-sym))
-				 ((stringp cmd-sym) cmd-sym))) command " ")) escripts "&&"))))
+(defun cmd-sym-to-string (sym)
+  (pcase sym
+    ((pred symbolp) (symbol-name sym))
+    ((pred stringp) sym)))
 
-(defun escript-output (&rest escripts)
+(defun concat-command (command)
+  (mapconcat 'cmd-sym-to-string command " "))
+
+(defun concat-scripts (escripts delim)
+  (mapconcat 'concat-command escripts delim))
+
+
+(defun escript-last (&optional delim &rest escripts)
   (progn
 	(let* ((reverse-scripts (reverse escripts))
 		  (no-out-commands (reverse (cdr reverse-scripts)))
@@ -36,7 +25,7 @@
 		  (mapconcat
 		   (lambda (cmd-sym)
 			 (cond ((symbolp cmd-sym) (symbol-name cmd-sym))
-				   ((stringp cmd-sym) cmd-sym))) command " ")) no-out-commands  ";"))
+				   ((stringp cmd-sym) cmd-sym))) command " ")) no-out-commands (or delim ";")))
 	  
 	  (let ((escript-proc (start-process-shell-command
 						   out-buf-name
@@ -50,7 +39,6 @@
 
 	  (with-current-buffer out-buf-name
 		(cdr (cdr (cdr (reverse (split-string (buffer-string) "\n")))))))))
-
 
 (defun escript--get-bin-directories ()
   (let ((path-var (getenv "PATH")))
@@ -78,16 +66,29 @@
 	(if bin-path (list bin-path) (escript--get-bin-directories)))))
 
 (defun escript--setq-bin-name (bin-name-cell)
-  (set (car bin-name-cell) (cdr bin-name-cell)))
+  (let ((bin-sym (car bin-name-cell)))
+    (make-local-variable bin-sym)
+    (set bin-sym (cdr bin-name-cell))))
 
 (defun escript--define-bin-vars (binary-cells)
   (mapc 'escript--setq-bin-name  binary-cells))
 
-(escript--define-bin-vars (escript--list-binaries))
+(defmacro escript-bin-names ()
+  (escript--define-bin-vars (escript--list-binaries)))
 
-(escript-all
- (escript-output '(acceleration_speed))
- '(emacs-28.1)
- '(MagickCore-config))
+(defun escript-pipe (&rest escripts)
+  (escript "|" escripts))
+
+(defun escript-out (delim &rest escripts)
+  (print (escript ";" escripts)))
+  
+(print (escript ";" '(ls)))
+(escript-out ";" '(ls))
+
+(escript-pipe
+ '(ls)
+ '(cat))
+
+(escript-out ";" '(pwd))
 
 (provide 'escript)
