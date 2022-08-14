@@ -102,17 +102,34 @@
   (escript--define-bin-vars (escript--list-binaries)))
 
 (defun escript-pipe (&rest escripts)
-  (escript "|" escripts))
+  (apply #'escript "|" escripts))
+
+(defun escript-and (&rest escripts)
+  (apply #'escript "&&" escripts))
+
+(defun escript-all (&rest escripts)
+  (apply #'escript ";" escripts))
 
 (defun escript-out (delim &rest escripts)
-  (print (escript ";" escripts)))
+  (print (apply #'escript delim escripts)))
+
+(defun escript-pipe-out (&rest escripts)
+  (print (apply #'escript-pipe escripts)))
+
+(defun escript-and-out (delim &rest escripts)
+  (print (apply #'escript-and escripts)))
+
+(defun escript-all-out (&rest escripts)
+  (print (apply #'escript-all escripts)))
   
 (print (escript ";" '(ls)))
-(escript-out ";" '(ls))
+(escript-all-out
+ (escript-all
+  '(ls "/bin/nproc"))
+ '(pwd))
 
-(escript-pipe
- '(ls)
- '(cat))
+(escript-pipe-out
+ '(ls))
 
 (escript-out ";" '(pwd))
 
