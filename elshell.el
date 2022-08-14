@@ -10,6 +10,31 @@
 (defun concat-scripts (escripts delim)
   (mapconcat 'concat-command escripts delim))
 
+(defun read-command-buffer (buf)
+  (with-current-buffer buf
+    (let* ((buf-str (buffer-string))
+          (buf-str-len (length buf-str)))
+      (if (> buf-str-len 1)
+          (substring buf-str 0 (- (length buf-str) 1))
+        buf-str))))
+
+(defun escript--run-cmd (name buf cmd)
+  (let ((proc (start-process-shell-command name buf cmd)))
+    (set-process-sentinel proc #'ignore)
+    proc))
+
+(defun escript (delim &rest escripts)
+  (progn
+    (let ((out-buf (get-buffer-create "escript-out")))
+      (with-current-buffer out-buf
+        (erase-buffer))
+      
+      (let ((escript-proc
+             (escript--run-cmd
+              "escript" out-buf (concat-scripts escripts delim))))
+        (progn
+          (while (accept-process-output escript-proc))
+          (read-command-buffer out-buf))))))
 
 (defun escript-last (&optional delim &rest escripts)
   (progn
