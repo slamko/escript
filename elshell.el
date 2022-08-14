@@ -98,8 +98,14 @@
 (defun escript--define-bin-vars (binary-cells)
   (mapc 'escript--setq-bin-name  binary-cells))
 
-(defmacro escript-bin-names ()
+(defun escript-import-env ()
   (escript--define-bin-vars (escript--list-binaries)))
+
+(defun escript-print (str)
+  (princ str))
+
+(defun escript-printn (str)
+  (princ (format "%s\n" str)))
 
 (defun escript-pipe (&rest escripts)
   (apply #'escript "|" escripts))
@@ -110,27 +116,31 @@
 (defun escript-all (&rest escripts)
   (apply #'escript ";" escripts))
 
+(defun escript-one (&rest escripts)
+  (apply #'escript-all escripts))
+
 (defun escript-out (delim &rest escripts)
-  (print (apply #'escript delim escripts)))
+  (escript-print (apply #'escript delim escripts)))
 
 (defun escript-pipe-out (&rest escripts)
-  (print (apply #'escript-pipe escripts)))
+  (escript-print (apply #'escript-pipe escripts)))
 
 (defun escript-and-out (delim &rest escripts)
-  (print (apply #'escript-and escripts)))
+  (escript-print (apply #'escript-and escripts)))
 
 (defun escript-all-out (&rest escripts)
-  (print (apply #'escript-all escripts)))
+  (escript-print (apply #'escript-all escripts)))
   
-(print (escript ";" '(ls)))
-(escript-all-out
- (escript-all
-  '(ls "/bin/nproc"))
- '(pwd))
+(defun escript-one-out (&rest escripts)
+  (apply #'escript-all-out escripts))
+
+(escript-one-out
+ '(tree
+   (escript-one '(pwd))))
 
 (escript-pipe-out
  '(ls))
 
-(escript-out ";" '(pwd))
+(escript-import-env)
 
 (provide 'escript)
