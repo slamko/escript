@@ -1,14 +1,14 @@
 
 (defun cmd-sym-to-string (sym)
   (pcase sym
-    ((pred symbolp) (symbol-name sym))
-    ((pred stringp) sym)))
+     ((pred symbolp) (symbol-name sym))
+     ((pred stringp) sym)))
 
 (defun concat-command (command)
-  (mapconcat 'cmd-sym-to-string command " "))
+  (mapconcat #'cmd-sym-to-string command " "))
 
 (defun concat-scripts (escripts delim)
-  (mapconcat 'concat-command escripts delim))
+  (mapconcat #'concat-command escripts delim))
 
 (defun read-command-buffer (buf)
   (with-current-buffer buf
@@ -90,16 +90,22 @@
    (escript--all-bins
 	(if bin-path (list bin-path) (escript--get-bin-directories)))))
 
-(defun escript--setq-bin-name (bin-name-cell)
+(defun escript--list-env ()
+  (mapcar (lambda (envv)
+            (let ((env-val-l (split-string envv "=" t))) 
+                  (cons (intern (car env-val-l)) (apply #'concat (cdr env-val-l))))) process-environment))
+
+(defun escript--setq-var-name (bin-name-cell)
   (let ((bin-sym (car bin-name-cell)))
     (make-local-variable bin-sym)
     (set bin-sym (cdr bin-name-cell))))
 
-(defun escript--define-bin-vars (binary-cells)
-  (mapc 'escript--setq-bin-name  binary-cells))
+(defun escript--define-sh-vars (binary-cells)
+  (mapc #'escript--setq-var-name  binary-cells))
 
 (defun escript-import-env ()
-  (escript--define-bin-vars (escript--list-binaries)))
+  (escript--define-sh-vars (escript--list-env))
+  (escript--define-sh-vars (escript--list-binaries)))
 
 (defun escript-print (str)
   (princ str))
@@ -134,6 +140,9 @@
 (defun escript-one-out (&rest escripts)
   (apply #'escript-all-out escripts))
 
+(getenv )
+process-environment
+
 (escript-one-out
  '(tree
    (escript-one '(pwd))))
@@ -142,5 +151,8 @@
  '(ls))
 
 (escript-import-env)
+
+(escript-one-out
+ '(tree XDG_RUNTIME_DIR))
 
 (provide 'escript)
