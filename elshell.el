@@ -1,3 +1,8 @@
+(require 'cl-lib)
+
+(cl-defstruct proc-out
+  (err "")
+  (out ""))
 
 (defun cmd-sym-to-string (sym)
   (pcase sym
@@ -19,14 +24,21 @@
         buf-str))))
 
 (defun escript--run-cmd (name buf cmd)
-  (let ((proc (start-process-shell-command name buf cmd)))
-    (set-process-sentinel proc #'ignore)
-    proc))
-
+  (make-process
+   :name name
+   :buffer buf
+   :sentinel #'ignore
+   :command `("/bin/sh" "-c" ,cmd)
+   :connection-type 'pipe
+   :stderr (get-buffer-create "escript-err")))
+   
 (defun escript (delim &rest escripts)
   (progn
-    (let ((out-buf (get-buffer-create "escript-out")))
+    (let ((out-buf (get-buffer-create "escript-out"))
+          (err-buf (get-buffer-create "escript-err")))
       (with-current-buffer out-buf
+        (erase-buffer))
+      (with-current-buffer err-buf
         (erase-buffer))
       
       (let ((escript-proc
@@ -34,7 +46,9 @@
               "escript" out-buf (concat-scripts escripts delim))))
         (progn
           (while (accept-process-output escript-proc))
-          (read-command-buffer out-buf))))))
+          (make-proc-out
+           :out (read-command-buffer out-buf)
+           :err (read-command-buffer err-buf)))))))
 
 (defun escript-last (&optional delim &rest escripts)
   (progn
@@ -65,6 +79,7 @@
 	  (with-current-buffer out-buf-name
 		(cdr (cdr (cdr (reverse (split-string (buffer-string) "\n")))))))))
 
+
 (defun escript--get-bin-directories ()
   (let ((path-var (getenv "PATH")))
 	(when path-var
@@ -84,6 +99,24 @@
              (not (assq bin-symbol unique-bin-names))
              (file-executable-p bin-path) (not (file-directory-p bin-path)))
 			(setq unique-bin-names (push (cons bin-symbol bin-path) unique-bin-names)))))))
+
+(defun redirect (escripts-l file stdout stderr)
+  (let ((out-buf (get-buffer-create "escript-out")))
+      (with-current-buffer out-buf
+        (erase-buffer))
+      
+      (let ((escript-proc
+             (escript--run-cmd
+              "escript" out-buf
+              (concat (concat-scripts escripts-l delim)
+                      (concat
+                       (cond ((and stdout stderr) "1>&2")
+                             (stdout ">")
+                             (stderr "2>")) file)))))
+        (progn
+          (while (accept-process-output escript-proc))
+          (read-command-buffer out-buf)))))
+  
 
 (defun escript--list-binaries (&optional bin-path)
   (escript--unique-bins
@@ -140,12 +173,15 @@
 (defun escript-one-out (&rest escripts)
   (apply #'escript-all-out escripts))
 
-(getenv )
-process-environment
-
 (escript-one-out
  '(tree
    (escript-one '(pwd))))
+
+(redirect
+ '(ls)
+ "./lsout"
+ t
+ nil)
 
 (escript-pipe-out
  '(ls))
