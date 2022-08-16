@@ -1,4 +1,5 @@
 (require 'cl-lib)
+(require 'f)
 
 (cl-defstruct proc-out
   (err "")
@@ -100,24 +101,15 @@
              (file-executable-p bin-path) (not (file-directory-p bin-path)))
 			(setq unique-bin-names (push (cons bin-symbol bin-path) unique-bin-names)))))))
 
-(defun redirect (escripts-l file stdout stderr)
-  (let ((out-buf (get-buffer-create "escript-out")))
-      (with-current-buffer out-buf
-        (erase-buffer))
-      
-      (let ((escript-proc
-             (escript--run-cmd
-              "escript" out-buf
-              (concat (concat-scripts escripts-l delim)
-                      (concat
-                       (cond ((and stdout stderr) "1>&2")
-                             (stdout ">")
-                             (stderr "2>")) file)))))
-        (progn
-          (while (accept-process-output escript-proc))
-          (read-command-buffer out-buf)))))
+(defun redirect (proc file stdout stderr)
+  (cond ((and stdout stderr)
+          (f-write-text (proc-out-out proc) 'utf-8 file)
+          (f-write-text (proc-out-err proc) 'utf-8 file))
+         (stdout 
+          (f-write-text (proc-out-out proc) 'utf-8 file))
+         (stderr 
+          (f-write-text (proc-out-err proc) 'utf-8 file))))
   
-
 (defun escript--list-binaries (&optional bin-path)
   (escript--unique-bins
    (escript--all-bins
@@ -147,16 +139,16 @@
   (princ (format "%s\n" str)))
 
 (defun escript-pipe (&rest escripts)
-  (apply #'escript "|" escripts))
+  (proc-out-out (apply #'escript "|" escripts)))
 
 (defun escript-and (&rest escripts)
-  (apply #'escript "&&" escripts))
+  (proc-out-out (apply #'escript "&&" escripts)))
 
 (defun escript-all (&rest escripts)
-  (apply #'escript ";" escripts))
+  (proc-out-out (apply #'escript ";" escripts)))
 
 (defun escript-one (&rest escripts)
-  (apply #'escript-all escripts))
+  (proc-out-out (apply #'escript-all escripts)))
 
 (defun escript-out (delim &rest escripts)
   (escript-print (apply #'escript delim escripts)))
@@ -178,10 +170,12 @@
    (escript-one '(pwd))))
 
 (redirect
- '(ls)
+ (escript
+  ";"
+  '(ls))
  "./lsout"
  t
- nil)
+ nil) 
 
 (escript-pipe-out
  '(ls))
