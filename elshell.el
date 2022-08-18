@@ -2,10 +2,12 @@
 (require 'f)
 
 (cl-defstruct proc-out
-  (err "")
-  (out ""))
+  (out "")
+  (err ""))
 
-(defvar-local escript--err-cache "/home/slamko/.cache/escript")
+(defvar-local escript--err-cache
+  (concat (getenv "HOME" "/.cache/escript.err"))
+  "Cache file used as stderr buffer for executed processes")
 
 (defun cmd-sym-to-string (sym)
   (pcase sym
@@ -16,7 +18,8 @@
   (mapconcat #'cmd-sym-to-string command " "))
 
 (defun concat-command-redirect (command)
-  (concat (mapconcat #'cmd-sym-to-string command " ") " 2>>/home/slamko/.cache/escript"))
+  (concat
+   (mapconcat #'cmd-sym-to-string command " ") (concat " 2>>" escript--err-cache)))
 
 (defun concat-scripts (escripts delim)
   (mapconcat #'concat-command-redirect escripts delim))
@@ -51,35 +54,6 @@
           (make-proc-out
            :out (read-command-buffer out-buf)
            :err (f-read-text escript--err-cache)))))))
-  
-(defun escript-last (&optional delim &rest escripts)
-  (progn
-	(let* ((reverse-scripts (reverse escripts))
-		  (no-out-commands (reverse (cdr reverse-scripts)))
-		  (last-out-command (car reverse-scripts))
-		  (out-buf-name (concat "escript-"(number-to-string (random)))))
-	  
-      (start-process-shell-command
-       "escript" nil
-	   (mapconcat
-		(lambda (command)
-		  (mapconcat
-		   (lambda (cmd-sym)
-			 (cond ((symbolp cmd-sym) (symbol-name cmd-sym))
-				   ((stringp cmd-sym) cmd-sym))) command " ")) no-out-commands (or delim ";")))
-	  
-	  (let ((escript-proc (start-process-shell-command
-						   out-buf-name
-						   (get-buffer-create out-buf-name)
-						   (mapconcat
-							(lambda (cmd-sym)
-							  (cond ((symbolp cmd-sym) (symbol-name cmd-sym))
-									((stringp cmd-sym) cmd-sym))) last-out-command " "))))
-		
-		(while (accept-process-output escript-proc)))
-
-	  (with-current-buffer out-buf-name
-		(cdr (cdr (cdr (reverse (split-string (buffer-string) "\n")))))))))
 
 (defun escript--get-bin-directories ()
   (let ((path-var (getenv "PATH")))
@@ -106,13 +80,28 @@
          (progn
            (f-write-text (proc-out-out proc) 'utf-8 file)
            (f-write-text (proc-out-err proc) 'utf-8 file)
-           ""))
+           (make-proc-out
+            :err ""
+            :out "")))
          (stdout 
           (progn (f-write-text (proc-out-out proc) 'utf-8 file)
-                 ""))
+                 (make-proc-out
+                  :out ""
+                  :err ""))
          (stderr 
           (progn (f-write-text (proc-out-err proc) 'utf-8 file)
-                 (proc-out-out proc)))))
+                 (make-proc-out
+                  :out (proc-out-out proc)
+                  :err ""))))))
+
+(defun redirect-str (proc file stdout stderr)
+    (proc-out-out (redirect proc file stdout stderr)))
+
+(defun redirect-str-stdout (proc file)
+    (redirect-str proc file t nil))
+
+(defun redirect-str-stderr (proc file)
+    (redirect-str proc file nil t))
 
 (defun redirect-stdout (proc file)
   (redirect proc file t nil))
@@ -148,18 +137,6 @@
 (defun escript-printn (str)
   (princ (format "%s\n" str)))
 
-(defun pipe-str (&rest escripts)
-  (proc-out-out (apply #'pipe escripts)))
-
-(defun escript-and-str (&rest escripts)
-  (proc-out-out (apply #'escript "&&" escripts)))
-
-(defun escript-all-str (&rest escripts)
-  (apply #'escript ";" escripts))
-
-(defun escript-one-str (&rest escripts)
-  (apply #'escript-all-str escripts))
-
 (defun pipe (&rest escripts)
   (apply #'escript "|"
          (mapcar (lambda (script)
@@ -176,20 +153,32 @@
 (defun escript-one (&rest escripts)
   (apply #'escript-all escripts))
 
-(defun escript-out (delim &rest escripts)
-  (escript-print (apply #'escript delim escripts)))
+(defun pipe-str (&rest escripts)
+  (proc-out-out (apply #'pipe escripts)))
 
-(defun escript-pipe-out (&rest escripts)
+(defun escript-and-str (&rest escripts)
+  (proc-out-out (apply #'escript "&&" escripts)))
+
+(defun escript-all-str (&rest escripts)
+  (apply #'escript ";" escripts))
+
+(defun escript-one-str (&rest escripts)
+  (apply #'escript-all-str escripts))
+
+(defun escript-out (delim &rest escripts)
+  (escript-print (proc-out-out (apply #'escript delim escripts))))
+
+(defun pipe-out (&rest escripts)
   (escript-print (proc-out-out (apply #'pipe escripts)))
   (escript-print (proc-out-err (apply #'pipe escripts))))
 
 (defun escript-and-out (delim &rest escripts)
-  (escript-print (proc-out-out (apply #'escript "&&" escripts)))
-  (escript-print (proc-out-err (apply #'escript "&&" escripts))))
+  (escript-print (proc-out-out (apply #'escript-and escripts)))
+  (escript-print (proc-out-err (apply #'escript-and escripts))))
 
 (defun escript-all-out (&rest escripts)
-  (escript-print (proc-out-out (apply #'escript ";" escripts)))
-  (escript-print (proc-out-err (apply #'escript ";" escripts))))
+  (escript-print (proc-out-out (apply #'escript-all escripts)))
+  (escript-print (proc-out-err (apply #'escript-all escripts))))
   
 (defun escript-one-out (&rest escripts)
   (apply #'escript-all-out escripts))
