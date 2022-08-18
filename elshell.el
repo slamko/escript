@@ -5,6 +5,8 @@
   (err "")
   (out ""))
 
+(defvar-local escript--err-cache "/home/slamko/.cache/escript")
+
 (defun cmd-sym-to-string (sym)
   (pcase sym
      ((pred symbolp) (symbol-name sym))
@@ -36,12 +38,10 @@
    
 (defun escript (delim &rest escripts)
   (progn
-    (let ((out-buf (get-buffer-create "escript-out"))
-          (err-buf (get-buffer-create "escript-err")))
+    (let ((out-buf (get-buffer-create "escript-out")))
       (with-current-buffer out-buf
         (erase-buffer))
-      (with-current-buffer err-buf
-        (erase-buffer))
+      (delete-file escript--err-cache)
       
       (let ((escript-proc
              (escript--run-cmd
@@ -50,7 +50,7 @@
           (while (accept-process-output escript-proc))
           (make-proc-out
            :out (read-command-buffer out-buf)
-           :err (f-read-text "/home/slamko/.cache/escript")))))))
+           :err (f-read-text escript--err-cache)))))))
   
 (defun escript-last (&optional delim &rest escripts)
   (progn
@@ -106,13 +106,19 @@
          (progn
            (f-write-text (proc-out-out proc) 'utf-8 file)
            (f-write-text (proc-out-err proc) 'utf-8 file)
-           "")
+           ""))
          (stdout 
           (progn (f-write-text (proc-out-out proc) 'utf-8 file)
                  ""))
          (stderr 
           (progn (f-write-text (proc-out-err proc) 'utf-8 file)
-                 stdout)))))
+                 (proc-out-out proc)))))
+
+(defun redirect-stdout (proc file)
+  (redirect proc file t nil))
+
+(defun redirect-stderr (proc file)
+  (redirect proc file nil t))
   
 (defun escript--list-binaries (&optional bin-path)
   (escript--unique-bins
@@ -137,7 +143,7 @@
   (escript--define-sh-vars (escript--list-binaries)))
 
 (defun escript-print (str)
-  (princ str))
+  (when (not (string= str "")) (princ str)))
 
 (defun escript-printn (str)
   (princ (format "%s\n" str)))

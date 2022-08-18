@@ -1,5 +1,4 @@
 
-
 (escript-one-out
  '(tree
    (escript-one '(pwd))))
@@ -12,9 +11,14 @@
  t
  nil) 
 
-(escript-pipe-out
- "ls"
- '(cat))
+(redirect-stdout
+ (pipe
+  (redirect-stderr
+   (escript-one-str
+    '(pwd))
+   "/home/slamko/pwd")
+  '(ls))
+ "~/ls")
 
  (escript-import-env)
 
