@@ -13,8 +13,11 @@
 (defun concat-command (command)
   (mapconcat #'cmd-sym-to-string command " "))
 
+(defun concat-command-redirect (command)
+  (concat (mapconcat #'cmd-sym-to-string command " ") " 2>>/home/slamko/.cache/escript"))
+
 (defun concat-scripts (escripts delim)
-  (mapconcat #'concat-command escripts delim))
+  (mapconcat #'concat-command-redirect escripts delim))
 
 (defun read-command-buffer (buf)
   (with-current-buffer buf
@@ -29,9 +32,7 @@
    :name name
    :buffer buf
    :sentinel #'ignore
-   :command `("/bin/sh" "-c" ,cmd)
-   :connection-type 'pipe
-   :stderr (get-buffer-create "escript-err")))
+   :command `("/bin/sh" "-c" ,cmd)))
    
 (defun escript (delim &rest escripts)
   (progn
@@ -49,8 +50,8 @@
           (while (accept-process-output escript-proc))
           (make-proc-out
            :out (read-command-buffer out-buf)
-           :err (read-command-buffer err-buf)))))))
-
+           :err (f-read-text "/home/slamko/.cache/escript")))))))
+  
 (defun escript-last (&optional delim &rest escripts)
   (progn
 	(let* ((reverse-scripts (reverse escripts))
@@ -80,7 +81,6 @@
 	  (with-current-buffer out-buf-name
 		(cdr (cdr (cdr (reverse (split-string (buffer-string) "\n")))))))))
 
-
 (defun escript--get-bin-directories ()
   (let ((path-var (getenv "PATH")))
 	(when path-var
@@ -103,12 +103,16 @@
 
 (defun redirect (proc file stdout stderr)
   (cond ((and stdout stderr)
-          (f-write-text (proc-out-out proc) 'utf-8 file)
-          (f-write-text (proc-out-err proc) 'utf-8 file))
+         (progn
+           (f-write-text (proc-out-out proc) 'utf-8 file)
+           (f-write-text (proc-out-err proc) 'utf-8 file)
+           "")
          (stdout 
-          (f-write-text (proc-out-out proc) 'utf-8 file))
+          (progn (f-write-text (proc-out-out proc) 'utf-8 file)
+                 ""))
          (stderr 
-          (f-write-text (proc-out-err proc) 'utf-8 file))))
+          (progn (f-write-text (proc-out-err proc) 'utf-8 file)
+                 stdout)))))
   
 (defun escript--list-binaries (&optional bin-path)
   (escript--unique-bins
@@ -138,51 +142,53 @@
 (defun escript-printn (str)
   (princ (format "%s\n" str)))
 
-(defun escript-pipe (&rest escripts)
-  (proc-out-out (apply #'escript "|" escripts)))
+(defun pipe-str (&rest escripts)
+  (proc-out-out (apply #'pipe escripts)))
 
-(defun escript-and (&rest escripts)
+(defun escript-and-str (&rest escripts)
   (proc-out-out (apply #'escript "&&" escripts)))
 
+(defun escript-all-str (&rest escripts)
+  (apply #'escript ";" escripts))
+
+(defun escript-one-str (&rest escripts)
+  (apply #'escript-all-str escripts))
+
+(defun pipe (&rest escripts)
+  (apply #'escript "|"
+         (mapcar (lambda (script)
+                   (if (stringp script)
+                       (list 'echo script)
+                     script)) escripts)))
+
+(defun escript-and (&rest escripts)
+  (apply #'escript "&&" escripts))
+
 (defun escript-all (&rest escripts)
-  (proc-out-out (apply #'escript ";" escripts)))
+  (apply #'escript ";" escripts))
 
 (defun escript-one (&rest escripts)
-  (proc-out-out (apply #'escript-all escripts)))
+  (apply #'escript-all escripts))
 
 (defun escript-out (delim &rest escripts)
   (escript-print (apply #'escript delim escripts)))
 
 (defun escript-pipe-out (&rest escripts)
-  (escript-print (apply #'escript-pipe escripts)))
+  (escript-print (proc-out-out (apply #'pipe escripts)))
+  (escript-print (proc-out-err (apply #'pipe escripts))))
 
 (defun escript-and-out (delim &rest escripts)
-  (escript-print (apply #'escript-and escripts)))
+  (escript-print (proc-out-out (apply #'escript "&&" escripts)))
+  (escript-print (proc-out-err (apply #'escript "&&" escripts))))
 
 (defun escript-all-out (&rest escripts)
-  (escript-print (apply #'escript-all escripts)))
+  (escript-print (proc-out-out (apply #'escript ";" escripts)))
+  (escript-print (proc-out-err (apply #'escript ";" escripts))))
   
 (defun escript-one-out (&rest escripts)
   (apply #'escript-all-out escripts))
 
-(escript-one-out
- '(tree
-   (escript-one '(pwd))))
-
-(redirect
- (escript
-  ";"
-  '(ls))
- "./lsout"
- t
- nil) 
-
-(escript-pipe-out
- '(ls))
-
-(escript-import-env)
-
-(escript-one-out
- '(tree XDG_RUNTIME_DIR))
+(defun val (proc)
+  (proc-out-out proc))
 
 (provide 'escript)
