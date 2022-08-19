@@ -6,7 +6,7 @@
   (err ""))
 
 (defvar-local escript--err-cache
-  (concat (getenv "HOME" "/.cache/escript.err"))
+  (concat (getenv "HOME") "/.cache/escript.err")
   "Cache file used as stderr buffer for executed processes")
 
 (defun cmd-sym-to-string (sym)
@@ -87,12 +87,12 @@
           (progn (f-write-text (proc-out-out proc) 'utf-8 file)
                  (make-proc-out
                   :out ""
-                  :err ""))
+                  :err "")))
          (stderr 
           (progn (f-write-text (proc-out-err proc) 'utf-8 file)
                  (make-proc-out
                   :out (proc-out-out proc)
-                  :err ""))))))
+                  :err "")))))
 
 (defun redirect-str (proc file stdout stderr)
     (proc-out-out (redirect proc file stdout stderr)))

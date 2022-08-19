@@ -1,4 +1,7 @@
 
+(load-file "./elshell.el")
+(require 'escript)
+
 (escript-one-out
  '(tree
    (escript-one '(pwd))))
@@ -13,7 +16,7 @@
 
 (redirect-stdout
  (pipe
-  (redirect-stderr
+  (redirect-str-stderr
    (escript-one-str
     '(pwd))
    "/home/slamko/pwd")
