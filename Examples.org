@@ -1,0 +1,77 @@
+#+title: Emacs integrated shell scripting examples
+
+* Basic shell forms integration
+** Loading escript
+#+begin_src emacs-lisp :tangle "./examples.el"
+(load-file "./escript.el")
+(require 'escript)
+#+end_src
+** Running commands
+To run one or more shell commands *escript* provides the following functions:
+
+1. *escript-one* - Execute one shell command 
+2. *escript-all* - Execute all given shell commands even if one of them exits with *non-zero* return code
+3. *escript-and* - Execute multiple shell command. Terminate command execution if one of them fails.
+
+These functions return the process object containing *stdout* and *stderr* output.
+They are meant to be nested in other *escript* forms and not used at the top level.  
+
+All of the functions above have a version with a suffix *out* and *str*.
+Those are designed to print the output on the screen and return the string respectively.
+*out* versions should be used at a top level.
+   
+#+begin_src emacs-lisp
+
+
+
+#+end_src
+
+** Complex chains with pipes and redirections
+For this *escript* provides *pipe* and *redirect*
+
+1. *pipe*     - Just as escript-one/all/and it takes a number of lists with command symbols and chains them toghether with shell's "|" syntax.
+2. *redirect* - This one is a bit more complex and as Emacs does not provide much functionallity for managing *stderr*
+   redirect operates with an external file stored in user's *.cache* directory. It takes a proc object (which can be retrieved with *escript-one/all/and*),
+   file name and too boolean values determining which stream to redirect (both can be *t*).
+
+   (redirect PROC FILE STDOUT STDERR)
+
+#+begin_src emacs-lisp
+
+#+end_src
+
+** If/else statements, loops, switch cases...
+As *escript* provides an *str* version for each outputing function you just use ELisp's builtin functionallity for *if/else loops etc...*
+
+(escript-one-out
+ '(tree
+   (escript-one '(pwd))))
+
+(redirect
+ (escript
+  ";"
+  '(ls))
+ "./lsout"
+ t
+ nil) 
+
+(if (string=
+     (substring
+      (pipe-str
+       '(acpi)
+       '(awk "'{print $3}'")) 0 1) "D")
+    (display-battery-mode))
+
+(redirect-stdout
+ (pipe
+  (redirect-str-stderr
+   (escript-one-str
+    '(pwd))
+   "/home/slamko/pwd")
+  '(ls))
+ "~/ls")
+
+ (escript-import-env)
+
+ (escript-one-out
+  '(tree HOME))
