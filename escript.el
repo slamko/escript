@@ -9,6 +9,10 @@
   (concat (getenv "HOME") "/.cache/escript.err")
   "Cache file used as stderr buffer for executed processes")
 
+(defvar-local escript--proc-subst-cache
+  (concat (getenv "HOME") "/.cache/escript.procsubst")
+  "Cache file used as stderr buffer for executed processes")
+
 (defun cmd-sym-to-string (sym)
   (pcase sym
      ((pred symbolp) (symbol-name sym))
@@ -53,7 +57,9 @@
           (while (accept-process-output escript-proc))
           (make-proc-out
            :out (read-command-buffer out-buf)
-           :err (f-read-text escript--err-cache)))))))
+           :err (let ((err-str (f-read-text escript--err-cache)))
+                  (f-delete escript--err-cache)
+                  err-str)))))))
 
 (defun escript--get-bin-directories ()
   (let ((path-var (getenv "PATH")))
@@ -93,6 +99,11 @@
                  (make-proc-out
                   :out (proc-out-out proc)
                   :err "")))))
+
+(defun proc-subst (proc)
+  (progn
+    (redirect proc escript--proc-subst-cache t nil)
+    escript--proc-subst-chace))
 
 (defun redirect-str (proc file stdout stderr)
     (proc-out-out (redirect proc file stdout stderr)))

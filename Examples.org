@@ -37,7 +37,15 @@ For this *escript* provides *pipe* and *redirect*
    (redirect PROC FILE STDOUT STDERR)
 
 #+begin_src emacs-lisp
-
+(escript-all-out
+ '(echo contents of file ok)
+ '(cat ok)
+ '(echo "diff:")
+ `(diff
+   "./ok"
+   ,(proc-subst
+    (escript-one
+     '(echo "ok")))))
 #+end_src
 
 ** If/else statements, loops, switch cases...
