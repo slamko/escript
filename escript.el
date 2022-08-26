@@ -37,15 +37,24 @@
         buf-str))))
 
 (defun escript--run-cmd (name buf cmd)
-  (make-process
-   :name name
-   :buffer buf
-   :sentinel #'ignore
-   :command `("/bin/sh" "-c" ,cmd)))
+  (let ((proc (start-process-shell-command
+               name buf cmd)))
+    (set-process-sentinel proc #'ignore)
+    proc))
+    
+  ;; (make-process
+   ;; :name name
+   ;; :buffer buf
+   ;; :sentinel #'ignore
+   ;; :command `("/bin/sh" "-c" ,cmd)))
    
 (defun escript (delim &rest escripts)
   (progn
-    (let ((out-buf (get-buffer-create "escript-out")))
+    (let ((out-buf (get-buffer "escript-out")))
+      (when out-buf
+        (kill-buffer out-buf)
+        (setq out-buf (get-buffer-create "escript-out")))
+
       (with-current-buffer out-buf
         (erase-buffer))
       (delete-file escript--err-cache)
@@ -173,8 +182,8 @@
 (defun escript-all-str (&rest escripts)
   (apply #'escript ";" escripts))
 
-(defun escript-one-str (&rest escripts)
-  (apply #'escript-all-str escripts))
+(defun escript-one-str (escript)
+  (apply #'escript-all-str (list escript)))
 
 (defun escript-out (delim &rest escripts)
   (escript-print (proc-out-out (apply #'escript delim escripts))))
@@ -191,8 +200,8 @@
   (escript-print (proc-out-out (apply #'escript-all escripts)))
   (escript-print (proc-out-err (apply #'escript-all escripts))))
   
-(defun escript-one-out (&rest escripts)
-  (apply #'escript-all-out escripts))
+(defun escript-one-out (escript)
+  (apply #'escript-all-out (list escript)))
 
 (defun val (proc)
   (proc-out-out proc))

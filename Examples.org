@@ -22,7 +22,15 @@ Those are designed to print the output on the screen and return the string respe
    
 #+begin_src emacs-lisp
 
+(escript-one-out
+ `(tree
+   ,(escript-one
+          '(ls))))
 
+(escript-all-out
+ '(pnmixer)
+ '(nm-applet)
+ '(ibus-daemon))
 
 #+end_src
 
@@ -79,7 +87,6 @@ As *escript* provides an *str* version for each outputing function you just use 
   '(ls))
  "~/ls")
 
+ (escript-all
+ '(ls))
  (escript-import-env)
-
- (escript-one-out
-  '(tree HOME))
